@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "wie_backend",
     "wie_cli",
+    "wie_libretro",
     "wie_util",
     "wie_core_arm",
     "wie_jvm_support",
