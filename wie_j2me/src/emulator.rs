@@ -146,6 +146,10 @@ impl Emulator for J2MEEmulator {
     fn tick(&mut self) -> Result<()> {
         self.system.tick()
     }
+
+    fn system(&self) -> &wie_backend::System {
+        &self.system
+    }
 }
 
 struct J2MEDescriptor {

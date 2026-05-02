@@ -11,6 +11,7 @@ use wie_util::Result;
 use crate::{
     AsyncCallable,
     executor::Executor,
+    net::Network,
     platform::Platform,
     task::{SleepFuture, YieldFuture},
     task_runner::TaskRunner,
@@ -33,6 +34,7 @@ pub struct System {
     event_queue: Arc<RwLock<EventQueue>>,
     audio: Arc<RwLock<Audio>>,
     task_runner: Arc<dyn TaskRunner>,
+    network: Network,
 }
 
 impl System {
@@ -52,7 +54,12 @@ impl System {
             event_queue: Arc::new(RwLock::new(EventQueue::new())),
             audio: Arc::new(RwLock::new(Audio::new(audio_sink))),
             task_runner: Arc::new(task_runner),
+            network: Network::new(),
         }
+    }
+
+    pub fn network(&self) -> &Network {
+        &self.network
     }
 
     pub fn tick(&mut self) -> Result<()> {

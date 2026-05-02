@@ -5,6 +5,7 @@ mod audio_sink;
 pub mod canvas;
 mod database;
 mod executor;
+mod net;
 mod platform;
 mod screen;
 mod system;
@@ -16,6 +17,7 @@ pub use self::{
     audio_sink::AudioSink,
     database::{Database, DatabaseRepository, RecordId},
     executor::{AsyncCallable, AsyncCallableResult},
+    net::{M_E_BADFD, M_E_ERROR, M_E_INPROGRESS, M_E_INVALID, M_E_NONE, M_E_NOTCONN, M_E_WOULDBLOCK, Network},
     platform::{Filesystem, Platform},
     screen::Screen,
     system::{Event, FilesystemOverlay, KeyCode, System},
@@ -36,6 +38,7 @@ use wie_util::{Result, WieError};
 pub trait Emulator {
     fn handle_event(&mut self, event: Event);
     fn tick(&mut self) -> Result<()>;
+    fn system(&self) -> &System;
 }
 
 pub struct ProfileSample {

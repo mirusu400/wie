@@ -154,6 +154,10 @@ impl Emulator for KtfEmulator {
             }
         })
     }
+
+    fn system(&self) -> &wie_backend::System {
+        &self.system
+    }
 }
 
 struct KtfAdf {

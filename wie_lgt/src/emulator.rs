@@ -138,6 +138,10 @@ impl Emulator for LgtEmulator {
             }
         })
     }
+
+    fn system(&self) -> &wie_backend::System {
+        &self.system
+    }
 }
 
 // almost similar to KtfAdf.. can we merge these?
