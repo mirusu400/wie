@@ -76,13 +76,25 @@ impl ArmCore {
     pub fn new(enable_gdbserver: bool, profile: Option<ProfileCallback>) -> Result<Self> {
         let mut engine = if enable_gdbserver {
             #[cfg(not(target_arch = "wasm32"))]
-            let engine = Box::new(DebuggedArm32CpuEngine::new()) as Box<dyn ArmEngine>;
+            {
+                Box::new(crate::engine::DebuggedArm32CpuEngine::new())
+            }
             #[cfg(target_arch = "wasm32")]
-            let engine = Box::new(Arm32CpuEngine::new());
-
-            engine
+            {
+                Box::new(Arm32CpuEngine::new())
+            }
         } else {
-            Box::new(Arm32CpuEngine::new())
+            // Default: Unicorn (QEMU TCG) on every host that allows JIT —
+            // 5–10× faster than the step interpreter on real games.
+            // iOS/tvOS and wasm32 fall through to the interpreter.
+            #[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "tvos")))]
+            {
+                Box::new(crate::engine::UnicornArmEngine::new())
+            }
+            #[cfg(any(target_arch = "wasm32", target_os = "ios", target_os = "tvos"))]
+            {
+                Box::new(Arm32CpuEngine::new())
+            }
         };
 
         engine.mem_map(FUNCTIONS_BASE, FUNCTIONS_SIZE, MemoryPermission::ReadExecute);

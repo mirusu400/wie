@@ -1,6 +1,8 @@
 mod arm32_cpu;
 #[cfg(not(target_arch = "wasm32"))]
 mod debugged_arm32_cpu;
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "tvos")))]
+mod unicorn;
 
 use wie_util::{AsAny, Result};
 
@@ -9,6 +11,8 @@ pub use arm32_cpu::Arm32CpuEngine;
 pub use debugged_arm32_cpu::DebuggedArm32CpuEngine;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use debugged_arm32_cpu::{DebugBreakpointKind, DebugInner, DebugSignal, DebugStopReason};
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "tvos")))]
+pub use unicorn::UnicornArmEngine;
 
 pub enum EngineRunResult {
     End,

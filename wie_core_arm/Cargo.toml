@@ -23,6 +23,12 @@ gdbstub = { version = "^0.7" }
 gdbstub_arch = { version = "^0.3" }
 crossbeam = { version = "^0.8" }
 
+# Unicorn (QEMU TCG) JIT backend. Pulled on every host that allows RWX
+# pages — i.e. everywhere except iOS/tvOS, where Apple blocks JIT for
+# unsigned apps. wasm32 also can't run native code.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "tvos")))'.dependencies]
+unicorn-engine = { version = "^2.1", default-features = false, features = ["arch_arm"] }
+
 [dev-dependencies]
 futures = { workspace = true, features = ["executor"] }
 futures-test = { workspace = true }
