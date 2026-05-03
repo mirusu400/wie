@@ -42,11 +42,13 @@ jobs:
             mode: cross
             artifact: libwie_libretro.so
 
-          # ---- Windows (mingw GNU) ----
+          # ---- Windows (native MSVC) ----
+          # cross-rs / mingw-gnu path hits a bindgen type mismatch in
+          # rust-libretro 0.3.2 (c_uint vs c_int). Native MSVC sidesteps it.
           - name: windows-x86_64
-            runner: ubuntu-latest
-            target: x86_64-pc-windows-gnu
-            mode: cross
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            mode: windows-msvc
             artifact: wie_libretro.dll
 
           # ---- macOS universal (best-effort; may fail until someone iterates) ----
@@ -128,6 +130,29 @@ jobs:
           ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
         run: bash scripts/build-android.sh ${{ matrix.target }}
 
+      # ---- Windows native MSVC path ----
+      - name: setup MSVC
+        if: matrix.mode == 'windows-msvc'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: install LLVM / cmake / ninja (windows)
+        if: matrix.mode == 'windows-msvc'
+        shell: pwsh
+        run: |
+          choco install -y llvm ninja
+          # cmake is preinstalled on windows-latest
+
+      - name: rust target (windows)
+        if: matrix.mode == 'windows-msvc'
+        run: rustup target add x86_64-pc-windows-msvc
+
+      - name: windows build
+        if: matrix.mode == 'windows-msvc'
+        shell: pwsh
+        env:
+          LIBCLANG_PATH: C:\Program Files\LLVM\bin
+        run: cargo build --release -p wie_libretro --target x86_64-pc-windows-msvc
+
       # ---- macOS universal path ----
       - name: macos toolchains
         if: matrix.mode == 'macos-universal'
@@ -182,7 +207,12 @@ jobs:
     name: publish release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Run even if some matrix entries failed — we still want to ship the
+    # binaries that did build. Skip only on cancellation.
+    if: |
+      always()
+      && !cancelled()
+      && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
@@ -192,10 +222,10 @@ jobs:
           merge-multiple: true
 
       - name: list artifacts
-        run: ls -la dist/
+        run: ls -la dist/ || true
 
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
