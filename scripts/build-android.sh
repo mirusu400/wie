@@ -32,18 +32,22 @@ case "$TARGET" in
     aarch64-linux-android)
         ABI=arm64-v8a
         CC_NAME="aarch64-linux-android${API}-clang"
+        BUILTINS_ARCH=aarch64
         ;;
     armv7-linux-androideabi)
         ABI=armeabi-v7a
         CC_NAME="armv7a-linux-androideabi${API}-clang"
+        BUILTINS_ARCH=arm
         ;;
     x86_64-linux-android)
         ABI=x86_64
         CC_NAME="x86_64-linux-android${API}-clang"
+        BUILTINS_ARCH=x86_64
         ;;
     i686-linux-android)
         ABI=x86
         CC_NAME="i686-linux-android${API}-clang"
+        BUILTINS_ARCH=i686
         ;;
     *)
         echo "unsupported target: $TARGET" >&2
@@ -95,7 +99,18 @@ export "CXX_${TARGET_LOWER}=${CC_NAME}++"
 export "AR_${TARGET_LOWER}=llvm-ar"
 export "CARGO_TARGET_${TARGET_UPPER}_LINKER=$CC_NAME"
 export "CARGO_TARGET_${TARGET_UPPER}_AR=llvm-ar"
-export "CARGO_TARGET_${TARGET_UPPER}_RUSTFLAGS=-L $STUB_OUT"
+
+# NDK r24+ ships compiler-rt only (no libgcc). rustc's Android target
+# spec doesn't auto-link compiler-rt builtins, so unicorn QEMU's
+# `__clear_cache` (and friends) fail to resolve at dlopen on device.
+# Pass the static builtins archive explicitly.
+BUILTINS_LIB="$(find "$NDK/toolchains/llvm/prebuilt/$HOST_TAG/lib/clang" \
+    -name "libclang_rt.builtins-${BUILTINS_ARCH}-android.a" 2>/dev/null | head -1)"
+if [[ -z "$BUILTINS_LIB" ]]; then
+    echo "could not locate libclang_rt.builtins-${BUILTINS_ARCH}-android.a in $NDK" >&2
+    exit 2
+fi
+export "CARGO_TARGET_${TARGET_UPPER}_RUSTFLAGS=-L $STUB_OUT -C link-arg=$BUILTINS_LIB"
 
 rustup target add "$TARGET" >/dev/null 2>&1 || true
 

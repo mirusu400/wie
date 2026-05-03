@@ -188,13 +188,28 @@ jobs:
           else
             src="target/${{ matrix.target }}/release/${{ matrix.artifact }}"
           fi
-          # libretro convention: <core>_<platform>.<ext>
           ext="${{ matrix.artifact }}"
           ext="${ext##*.}"
-          out="dist/wie_libretro_${{ matrix.name }}.${ext}"
-          cp "$src" "$out"
-          ls -la "$out"
-          file "$out" || true
+          name="${{ matrix.name }}"
+          # Filename conventions:
+          # - Android: RA Android only recognizes `*_libretro_android.so`,
+          #   so the .so inside the release MUST be named exactly
+          #   `wie_libretro_android.so`. Four ABIs collide on that name,
+          #   so we wrap each one in its own zip (`wie_libretro_<abi>.zip`).
+          # - Others: ship the .so / .dll / .dylib bare with the standard
+          #   `wie_libretro` core name.
+          case "$name" in
+            android-*)
+              core_file="wie_libretro_android.${ext}"
+              cp "$src" "dist/${core_file}"
+              python3 -c "import zipfile; zipfile.ZipFile('dist/wie_libretro_${name}.zip', 'w', zipfile.ZIP_DEFLATED).write('dist/${core_file}', arcname='${core_file}')"
+              rm -f "dist/${core_file}"
+              ;;
+            *)
+              cp "$src" "dist/wie_libretro_${name}.${ext}"
+              ;;
+          esac
+          ls -la dist/
 
       - uses: actions/upload-artifact@v4
         with:
