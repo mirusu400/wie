@@ -74,7 +74,7 @@ pub struct ArmCore {
 
 impl ArmCore {
     pub fn new(enable_gdbserver: bool, profile: Option<ProfileCallback>) -> Result<Self> {
-        let mut engine = if enable_gdbserver {
+        let mut engine: Box<dyn ArmEngine> = if enable_gdbserver {
             #[cfg(not(target_arch = "wasm32"))]
             {
                 Box::new(crate::engine::DebuggedArm32CpuEngine::new())

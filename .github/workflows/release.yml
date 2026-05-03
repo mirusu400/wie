@@ -1,0 +1,201 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ---- Linux (cross-rs, glibc) ----
+          - name: linux-x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            mode: cross
+            artifact: libwie_libretro.so
+
+          - name: linux-aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            mode: cross
+            artifact: libwie_libretro.so
+
+          # ---- Anbernic (RG DS / RG34XX SP — both Cortex-A5x aarch64 Linux) ----
+          # Same binary as linux-aarch64 but renamed for downstream clarity.
+          - name: anbernic-aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            mode: cross
+            artifact: libwie_libretro.so
+
+          # ---- Windows (mingw GNU) ----
+          - name: windows-x86_64
+            runner: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            mode: cross
+            artifact: wie_libretro.dll
+
+          # ---- macOS universal (best-effort; may fail until someone iterates) ----
+          - name: macos-universal
+            runner: macos-latest
+            mode: macos-universal
+            artifact: libwie_libretro.dylib
+
+          # ---- Android (NDK r26, API 24) ----
+          - name: android-arm64-v8a
+            runner: ubuntu-latest
+            target: aarch64-linux-android
+            mode: android
+            artifact: libwie_libretro.so
+
+          - name: android-armeabi-v7a
+            runner: ubuntu-latest
+            target: armv7-linux-androideabi
+            mode: android
+            artifact: libwie_libretro.so
+
+          - name: android-x86_64
+            runner: ubuntu-latest
+            target: x86_64-linux-android
+            mode: android
+            artifact: libwie_libretro.so
+
+          - name: android-x86
+            runner: ubuntu-latest
+            target: i686-linux-android
+            mode: android
+            artifact: libwie_libretro.so
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.name }}
+          cache-on-failure: true
+
+      # ---- cross-rs path (linux + windows-gnu) ----
+      - name: install cross
+        if: matrix.mode == 'cross'
+        run: |
+          cargo install cross --locked --version 0.2.5
+
+      - name: cross build
+        if: matrix.mode == 'cross'
+        run: cross build --release -p wie_libretro --target ${{ matrix.target }}
+
+      # ---- Android path ----
+      - name: setup NDK
+        if: matrix.mode == 'android'
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: false
+
+      - name: install cmake/ninja (android host)
+        if: matrix.mode == 'android'
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+
+      - name: rust target
+        if: matrix.mode == 'android'
+        run: rustup target add ${{ matrix.target }}
+
+      - name: android build
+        if: matrix.mode == 'android'
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash scripts/build-android.sh ${{ matrix.target }}
+
+      # ---- macOS universal path ----
+      - name: macos toolchains
+        if: matrix.mode == 'macos-universal'
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          brew install cmake ninja
+
+      - name: macos build (x86_64)
+        if: matrix.mode == 'macos-universal'
+        run: cargo build --release -p wie_libretro --target x86_64-apple-darwin
+
+      - name: macos build (aarch64)
+        if: matrix.mode == 'macos-universal'
+        run: cargo build --release -p wie_libretro --target aarch64-apple-darwin
+
+      - name: macos lipo
+        if: matrix.mode == 'macos-universal'
+        run: |
+          mkdir -p target/universal-apple-darwin/release
+          lipo -create -output target/universal-apple-darwin/release/libwie_libretro.dylib \
+            target/x86_64-apple-darwin/release/libwie_libretro.dylib \
+            target/aarch64-apple-darwin/release/libwie_libretro.dylib
+          file target/universal-apple-darwin/release/libwie_libretro.dylib
+
+      # ---- Collect artifact ----
+      - name: stage artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          if [[ "${{ matrix.mode }}" == "macos-universal" ]]; then
+            src="target/universal-apple-darwin/release/${{ matrix.artifact }}"
+          else
+            src="target/${{ matrix.target }}/release/${{ matrix.artifact }}"
+          fi
+          # libretro convention: <core>_<platform>.<ext>
+          ext="${{ matrix.artifact }}"
+          ext="${ext##*.}"
+          out="dist/wie_libretro_${{ matrix.name }}.${ext}"
+          cp "$src" "$out"
+          ls -la "$out"
+          file "$out" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wie_libretro_${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: list artifacts
+        run: ls -la dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

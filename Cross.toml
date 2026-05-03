@@ -1,0 +1,16 @@
+# cross-rs config for wie_libretro release builds.
+# unicorn-engine-sys needs cmake + ninja; cross-rs base images don't ship
+# them, so we install per target via pre-build hooks.
+
+[build]
+pre-build = [
+    "apt-get update",
+    "apt-get install -y --no-install-recommends cmake ninja-build pkg-config",
+]
+
+[target.x86_64-unknown-linux-gnu]
+[target.aarch64-unknown-linux-gnu]
+[target.armv7-unknown-linux-gnueabihf]
+
+[target.x86_64-pc-windows-gnu]
+# mingw image: cmake/ninja install via apt as above.

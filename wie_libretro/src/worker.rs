@@ -175,7 +175,7 @@ fn build_emulator(
     data: Vec<u8>,
     platform: Box<dyn Platform>,
 ) -> Result<Box<dyn Emulator>, Box<dyn Error>> {
-    let options = Options { enable_gdbserver: false };
+    let options = Options { enable_gdbserver: false, profile: None };
     let lower = path.to_ascii_lowercase();
     let filename = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_owned();
 
