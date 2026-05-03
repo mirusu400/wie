@@ -1,16 +1,29 @@
 # cross-rs config for wie_libretro release builds.
-# unicorn-engine-sys needs cmake + ninja; cross-rs base images don't ship
-# them, so we install per target via pre-build hooks.
+#
+# Why each package:
+# - cmake / ninja-build: unicorn-engine-sys builds QEMU via cmake.
+# - clang / libclang-dev: cross-rs 0.2.5 images ship libclang 3.8 which is
+#   too old for bindgen (>=5 needed). Installing the distro clang upgrades
+#   it AND drops clang's resource dir on disk, which is where `stdbool.h`
+#   lives — without it the unicorn build aborts pre-bindgen.
+# - pkg-config: unicorn build script probes via pkg-config first.
 
 [build]
 pre-build = [
     "apt-get update",
-    "apt-get install -y --no-install-recommends cmake ninja-build pkg-config",
+    "apt-get install -y --no-install-recommends cmake ninja-build pkg-config clang libclang-dev",
 ]
 
+# Pin :main images — the default 0.2.5 tags are Ubuntu 16.04, whose
+# libclang 3.8 is too old for current bindgen (needs >=5).
 [target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+
 [target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+
 [target.armv7-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:main"
 
 [target.x86_64-pc-windows-gnu]
-# mingw image: cmake/ninja install via apt as above.
+image = "ghcr.io/cross-rs/x86_64-pc-windows-gnu:main"
