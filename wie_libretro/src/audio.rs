@@ -40,7 +40,11 @@ impl RingBuffer {
     }
 
     fn push_stereo(&mut self, channels: u8, samples: &[i16]) {
-        let frames = if channels == 0 { samples.len() } else { samples.len() / channels as usize };
+        let frames = if channels == 0 {
+            samples.len()
+        } else {
+            samples.len() / channels as usize
+        };
         for f in 0..frames {
             let (l, r) = match channels {
                 1 => {

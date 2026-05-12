@@ -4,10 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use wie_backend::{
-    AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen,
-    canvas::Image,
-};
+use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen, canvas::Image};
 
 use crate::{
     audio::{LibretroAudioSink, RingBuffer},
@@ -26,10 +23,7 @@ pub struct LibretroPlatform {
 impl LibretroPlatform {
     pub fn new(screen: Arc<LibretroScreen>, audio_ring: Arc<Mutex<RingBuffer>>, data_root: Option<PathBuf>) -> Self {
         let (filesystem, database_repository) = match data_root {
-            Some(root) => (
-                LibretroFilesystem::with_base(root.clone()),
-                LibretroDatabaseRepository::with_base(root),
-            ),
+            Some(root) => (LibretroFilesystem::with_base(root.clone()), LibretroDatabaseRepository::with_base(root)),
             None => (
                 LibretroFilesystem::project_dirs_fallback(),
                 LibretroDatabaseRepository::project_dirs_fallback(),
@@ -50,10 +44,7 @@ impl Platform for LibretroPlatform {
     }
 
     fn now(&self) -> Instant {
-        let ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
+        let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
         Instant::from_epoch_millis(ms)
     }
 
@@ -175,4 +166,3 @@ impl Screen for LibretroScreen {
         self.state.lock().map(|s| s.height).unwrap_or(0)
     }
 }
-

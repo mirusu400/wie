@@ -83,7 +83,11 @@ impl EmulatorWorker {
             })?;
 
         match init_rx.recv() {
-            Ok(Ok(())) => Ok(EmulatorWorker { cmd_tx, res_rx, handle: Some(handle) }),
+            Ok(Ok(())) => Ok(EmulatorWorker {
+                cmd_tx,
+                res_rx,
+                handle: Some(handle),
+            }),
             Ok(Err(e)) => Err(format!("worker init failed: {e}").into()),
             Err(_) => Err("worker thread died during init".into()),
         }
@@ -131,9 +135,7 @@ fn worker_main(
 ) {
     let platform: Box<dyn Platform> = Box::new(LibretroPlatform::new(screen, audio_ring, data_root));
 
-    let build = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        build_emulator(path, data, platform)
-    }));
+    let build = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| build_emulator(path, data, platform)));
     let mut emu: Box<dyn Emulator> = match build {
         Ok(Ok(emu)) => emu,
         Ok(Err(e)) => {
@@ -170,12 +172,11 @@ fn worker_main(
     }
 }
 
-fn build_emulator(
-    path: String,
-    data: Vec<u8>,
-    platform: Box<dyn Platform>,
-) -> Result<Box<dyn Emulator>, Box<dyn Error>> {
-    let options = Options { enable_gdbserver: false, profile: None };
+fn build_emulator(path: String, data: Vec<u8>, platform: Box<dyn Platform>) -> Result<Box<dyn Emulator>, Box<dyn Error>> {
+    let options = Options {
+        enable_gdbserver: false,
+        profile: None,
+    };
     let lower = path.to_ascii_lowercase();
     let filename = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_owned();
 

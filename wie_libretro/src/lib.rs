@@ -17,16 +17,13 @@ use std::{
 use rust_libretro::{
     contexts::*,
     core::{Core, CoreOptions},
-    env_version, input_descriptor, input_descriptors, retro_core,
+    env_version, input_descriptors, retro_core,
     sys::{
-        RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_DOWN,
-        RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_L3,
-        RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_R, RETRO_DEVICE_ID_JOYPAD_R2,
-        RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_SELECT,
-        RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_X,
-        RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD, RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
-        retro_game_geometry, retro_game_info, retro_game_info_ext, retro_input_descriptor,
-        retro_system_av_info, retro_system_timing,
+        RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_DOWN, RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_L2,
+        RETRO_DEVICE_ID_JOYPAD_L3, RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_R, RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_R3,
+        RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
+        RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD, RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, retro_game_geometry,
+        retro_game_info, retro_game_info_ext, retro_input_descriptor, retro_system_av_info, retro_system_timing,
     },
     types::*,
 };
@@ -84,12 +81,7 @@ const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
 fn fetch_game_info_ext(env_cb: rust_libretro::sys::retro_environment_t) -> Result<(String, Vec<u8>), Box<dyn Error>> {
     let cb = env_cb.ok_or("no environment callback")?;
     let mut info_ext_ptr: *const retro_game_info_ext = ptr::null();
-    let ok = unsafe {
-        cb(
-            RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
-            &mut info_ext_ptr as *mut _ as *mut c_void,
-        )
-    };
+    let ok = unsafe { cb(RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, &mut info_ext_ptr as *mut _ as *mut c_void) };
     if !ok || info_ext_ptr.is_null() {
         return Err("GET_GAME_INFO_EXT not supported by frontend".into());
     }
@@ -146,7 +138,6 @@ impl WieLibretroCore {
             input: InputTracker::default(),
         }
     }
-
 }
 
 impl CoreOptions for WieLibretroCore {}
@@ -204,11 +195,7 @@ impl Core for WieLibretroCore {
         log::info!("wie_libretro deinit");
     }
 
-    fn on_load_game(
-        &mut self,
-        _info: Option<retro_game_info>,
-        ctx: &mut LoadGameContext,
-    ) -> Result<(), Box<dyn Error>> {
+    fn on_load_game(&mut self, _info: Option<retro_game_info>, ctx: &mut LoadGameContext) -> Result<(), Box<dyn Error>> {
         log::info!("on_load_game entry");
         if !ctx.set_pixel_format(PixelFormat::XRGB8888) {
             return Err("XRGB8888 not supported".into());
