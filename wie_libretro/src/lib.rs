@@ -17,10 +17,16 @@ use std::{
 use rust_libretro::{
     contexts::*,
     core::{Core, CoreOptions},
-    env_version, retro_core,
+    env_version, input_descriptor, input_descriptors, retro_core,
     sys::{
-        RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, retro_game_geometry, retro_game_info,
-        retro_game_info_ext, retro_system_av_info, retro_system_timing,
+        RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_DOWN,
+        RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_L3,
+        RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_R, RETRO_DEVICE_ID_JOYPAD_R2,
+        RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_SELECT,
+        RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_X,
+        RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD, RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
+        retro_game_geometry, retro_game_info, retro_game_info_ext, retro_input_descriptor,
+        retro_system_av_info, retro_system_timing,
     },
     types::*,
 };
@@ -41,6 +47,34 @@ const MAX_WIDTH: u32 = 480;
 const MAX_HEIGHT: u32 = 640;
 const FPS: f64 = 60.0;
 const SAMPLE_RATE: f64 = 44_100.0;
+/// One tick's worth of stereo audio frames at 44100/60. Submitted every
+/// retro_run (padded with silence on underrun) to satisfy libretro's sync
+/// audio contract — empty submissions segfault RA's WASAPI driver, and
+/// large batches (>WASAPI buffer ~3072 i16) segfault from the other side.
+const FRAMES_PER_TICK: usize = 735;
+
+/// Friendly button names shown in RetroArch's Quick Menu → Controls. The
+/// physical-key → RetroPad-button mapping itself is owned by RA; the core
+/// only consumes the resulting RetroPad bitmask, so users remap freely
+/// without any code change here. See `input::MAPPING` for RetroPad → KeyCode.
+const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "Up" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "Down" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "Left" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "Right" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "OK / 5" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Clear / *" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "#" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "0" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Soft Left" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Soft Right" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Call / Menu" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Hangup / End" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "1" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "3" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "7" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "9" },
+);
 
 /// rust-libretro 0.3.2 + bindgen 0.63 generates `retro_game_info` as an opaque
 /// 1-byte struct (`_address: u8`), so the by-value `Some(*game)` in the wrapper
@@ -154,6 +188,7 @@ impl Core for WieLibretroCore {
         log::info!("wie_libretro init (version {})", env!("CARGO_PKG_VERSION"));
 
         let gctx: GenericContext = (&mut *ctx).into();
+        gctx.set_input_descriptors(INPUT_DESCRIPTORS);
         // SAFETY: env callback valid throughout the core's lifetime.
         let env_cb = unsafe { *gctx.environment_callback() };
         if let Some(sys_path) = unsafe { rust_libretro::environment::get_system_directory(env_cb) } {
@@ -270,11 +305,14 @@ impl Core for WieLibretroCore {
         }
 
         if let Some(ring) = self.audio_ring.as_ref() {
-            let stereo = if let Ok(mut r) = ring.lock() { r.drain_stereo(2048) } else { Vec::new() };
-            if !stereo.is_empty() {
-                let actx: AudioContext = (&mut *ctx).into();
-                actx.batch_audio_samples(&stereo);
-            }
+            let mut stereo = if let Ok(mut r) = ring.lock() {
+                r.drain_stereo(FRAMES_PER_TICK)
+            } else {
+                Vec::new()
+            };
+            stereo.resize(FRAMES_PER_TICK * 2, 0);
+            let actx: AudioContext = (&mut *ctx).into();
+            actx.batch_audio_samples(&stereo);
         }
     }
 
