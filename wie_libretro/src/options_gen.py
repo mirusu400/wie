@@ -134,8 +134,8 @@ def write_options_rs(path: str):
 use rust_libretro::{{contexts::*, proc::CoreOptions, sys::*, types::JoypadState}};
 use wie_backend::KeyCode;
 
-{fmt_options()}
 #[derive(CoreOptions, Default)]
+{fmt_options()}
 pub struct Options;
 
 {fmt_slots_table()}
@@ -143,7 +143,6 @@ pub struct Options;
 {fmt_presets_table()}
 
 pub const PRESET_KEY: &str = "{PRESET_KEY}";
-pub const CUSTOM_PRESET: &str = "Custom";
 pub const DEFAULT_PRESET: &str = "Phone Keypad (default)";
 
 /// Build the active (JoypadState, KeyCode) mapping from the current

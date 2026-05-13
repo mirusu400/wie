@@ -10,6 +10,7 @@
 use rust_libretro::{contexts::*, proc::CoreOptions, sys::*, types::JoypadState};
 use wie_backend::KeyCode;
 
+#[derive(CoreOptions, Default)]
 #[options({
     "wie_input_layout",
     "Input > Layout",
@@ -584,7 +585,6 @@ use wie_backend::KeyCode;
         { "VOLUME_DOWN" },
     }
 })]
-#[derive(CoreOptions, Default)]
 pub struct Options;
 
 pub const SLOTS: &[(&str, JoypadState)] = &[
@@ -674,7 +674,6 @@ pub const PRESETS: &[(&str, &[KeyCode])] = &[
 ];
 
 pub const PRESET_KEY: &str = "wie_input_layout";
-pub const CUSTOM_PRESET: &str = "Custom";
 pub const DEFAULT_PRESET: &str = "Phone Keypad (default)";
 
 /// Build the active (JoypadState, KeyCode) mapping from the current
