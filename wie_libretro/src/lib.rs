@@ -2,6 +2,7 @@ mod audio;
 mod database;
 mod filesystem;
 mod input;
+mod options;
 mod system;
 mod worker;
 
@@ -50,23 +51,24 @@ const SAMPLE_RATE: f64 = 44_100.0;
 /// large batches (>WASAPI buffer ~3072 i16) segfault from the other side.
 const FRAMES_PER_TICK: usize = 735;
 
-/// Friendly button names shown in RetroArch's Quick Menu → Controls. The
-/// physical-key → RetroPad-button mapping itself is owned by RA; the core
-/// only consumes the resulting RetroPad bitmask, so users remap freely
-/// without any code change here. See `input::MAPPING` for RetroPad → KeyCode.
+/// Slot labels shown in RetroArch's Quick Menu → Controls for the
+/// physical-key → RetroPad-button rebind UI. The labels match the
+/// default ("Phone Keypad") preset; the actual WIPI/J2ME KeyCode each
+/// slot sends is configurable in Core Options (`wie_input_*`) so the
+/// label is a hint for the default case, not a contract.
 const INPUT_DESCRIPTORS: &[retro_input_descriptor] = &input_descriptors!(
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "Up" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "Down" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "Left" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "Right" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "OK / 5" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Clear / *" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "OK" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Clear" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "#" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "0" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Soft Left" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Soft Right" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Call / Menu" },
-    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Hangup / End" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Left Soft Key" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Right Soft Key" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Call" },
+    { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Hangup" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "1" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "3" },
     { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "7" },
@@ -140,7 +142,13 @@ impl WieLibretroCore {
     }
 }
 
-impl CoreOptions for WieLibretroCore {}
+impl CoreOptions for WieLibretroCore {
+    fn set_core_options(&self, ctx: &SetEnvironmentContext) -> bool {
+        // Forward to the generator-managed unit struct so the verbose
+        // #[options(...)] attribute stack stays in its own file.
+        options::Options.set_core_options(ctx)
+    }
+}
 
 impl Core for WieLibretroCore {
     fn get_info(&self) -> SystemInfo {
@@ -238,6 +246,11 @@ impl Core for WieLibretroCore {
         self.worker = None; // Drop joins the worker thread.
         self.screen = None;
         self.audio_ring = None;
+    }
+
+    fn on_options_changed(&mut self, ctx: &mut OptionsChangedContext) {
+        self.input.refresh_mapping(ctx);
+        log::info!("wie_libretro: input mapping refreshed ({} active slots)", self.input.active_slot_count());
     }
 
     fn on_run(&mut self, ctx: &mut RunContext, _delta_us: Option<i64>) {

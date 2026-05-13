@@ -1,34 +1,19 @@
-use rust_libretro::types::JoypadState;
+use rust_libretro::{contexts::OptionsChangedContext, types::JoypadState};
 use wie_backend::KeyCode;
 
-/// RetroPad button → WIPI/J2ME KeyCode.
-/// Order doesn't matter; we iterate the whole table on every poll.
-const MAPPING: &[(JoypadState, KeyCode)] = &[
-    (JoypadState::UP, KeyCode::UP),
-    (JoypadState::DOWN, KeyCode::DOWN),
-    (JoypadState::LEFT, KeyCode::LEFT),
-    (JoypadState::RIGHT, KeyCode::RIGHT),
-    (JoypadState::A, KeyCode::OK),
-    (JoypadState::B, KeyCode::CLEAR),
-    (JoypadState::X, KeyCode::HASH),
-    (JoypadState::Y, KeyCode::NUM0),
-    (JoypadState::L, KeyCode::LEFT_SOFT_KEY),
-    (JoypadState::R, KeyCode::RIGHT_SOFT_KEY),
-    (JoypadState::START, KeyCode::CALL),
-    (JoypadState::SELECT, KeyCode::HANGUP),
-    (JoypadState::L2, KeyCode::NUM1),
-    (JoypadState::R2, KeyCode::NUM3),
-    (JoypadState::L3, KeyCode::NUM7),
-    (JoypadState::R3, KeyCode::NUM9),
-];
+use crate::options;
 
 pub struct InputTracker {
     prev: JoypadState,
+    mapping: Vec<(JoypadState, KeyCode)>,
 }
 
 impl Default for InputTracker {
     fn default() -> Self {
-        Self { prev: JoypadState::empty() }
+        Self {
+            prev: JoypadState::empty(),
+            mapping: Vec::new(),
+        }
     }
 }
 
@@ -39,9 +24,20 @@ pub enum InputDelta {
 }
 
 impl InputTracker {
+    /// Rebuild the RetroPad → KeyCode table from the frontend's current
+    /// core-option values. Called once at init and again every time the
+    /// user touches the Options menu.
+    pub fn refresh_mapping(&mut self, ctx: &OptionsChangedContext) {
+        self.mapping = options::resolve_mapping(ctx);
+    }
+
+    pub fn active_slot_count(&self) -> usize {
+        self.mapping.len()
+    }
+
     pub fn diff(&mut self, curr: JoypadState) -> Vec<InputDelta> {
         let mut out = Vec::new();
-        for (button, key) in MAPPING {
+        for (button, key) in &self.mapping {
             let was = self.prev.contains(*button);
             let is = curr.contains(*button);
             if !was && is {
